@@ -48,18 +48,27 @@ numpy.zeros(5).tolist()`.
 
 ![Host memory per sandbox](./bench/chart-memory-per.png)
 
-| Backend | Wall-clock at N=100 | Memory delta per sandbox |
-|---|---:|---:|
-| forkd | 101 ms | 0.12 MiB |
-| CubeSandbox¹ | 390 ms | 5 MiB |
-| Firecracker cold-boot | 759 ms | 84 MiB |
-| gVisor (runsc) | 288.6 s | — |
-| Docker (runc) | 335.3 s | 4 MiB |
+| Backend | Wall-clock at N=100 | Memory delta per sandbox | Notes |
+|---|---:|---:|---|
+| **forkd** | **101 ms** | **0.12 MiB** | fork-from-warm via snapshot CoW |
+| CubeSandbox¹ | 20.3 s | 5 MiB | RustVMM microVM, cold-boot |
+| BoxLite² | 113.2 s | — | KVM microVM, cold-boot OCI rootfs |
+| OpenSandbox³ | 122.0 s | — | Docker runtime via abstraction layer |
+| Firecracker cold-boot | 759 ms | 84 MiB | raw VM boot, no orchestration |
+| gVisor (runsc) | 288.6 s | — | userspace kernel container |
+| Docker (runc) | 335.3 s | 4 MiB | standard container runtime |
 
-¹ CubeSandbox didn't install on the bench host due to port conflicts
-with an existing 1Panel stack; the number above combines Tencent's
-published P95 spawn (~90 ms at 50 concurrent) with the cold
-`import numpy` cost (~300 ms). See [`bench/CUBESANDBOX.md`](./bench/CUBESANDBOX.md).
+¹ CubeSandbox: 77 of 100 sandboxes spawned cleanly; the rest hit
+reflink-copy storage errors under concurrent load on this host. See
+[`bench/CUBESANDBOX.md`](./bench/CUBESANDBOX.md).
+
+² BoxLite is optimised for one long-lived stateful Box per workload,
+not 100 concurrent fresh microVMs. The cold fan-out is included for
+direct comparability. See [`bench/BOXLITE.md`](./bench/BOXLITE.md).
+
+³ OpenSandbox is an abstraction layer over Docker / K8s / gVisor /
+Kata / Firecracker; the number is for its default Docker runtime.
+See [`bench/OPENSANDBOX.md`](./bench/OPENSANDBOX.md).
 
 Reproduce: `bench/bench-spawn-100.sh` then `bench/generate_charts.py`.
 

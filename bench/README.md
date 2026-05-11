@@ -44,8 +44,23 @@ BENCH_RESULTS=/tmp/results.json python3 bench/generate_charts.py
 ```
 
 Each backend in the harness can be enabled/disabled with
-`--backend forkd|docker|gvisor|firecracker|cubesandbox` on
-`compare-all.py`.
+`--backends forkd|docker|gvisor|firecracker|cubesandbox|boxlite|opensandbox`
+on `compare-all.py`.
+
+### Backend prerequisites
+
+- **forkd** — pre-existing tagged snapshot (`forkd snapshot --tag pyagent ...`)
+  and per-child netns provisioned (`scripts/netns-setup.sh N`).
+- **docker** — Docker daemon running, `python:3.12-slim` image pullable.
+- **boxlite** — `pip install boxlite==0.9.3` (Python SDK is sufficient;
+  the optional `cargo install boxlite-cli` step needs `protoc` and is
+  skipped for benchmarking). Measurement notes in [`BOXLITE.md`](./BOXLITE.md).
+- **opensandbox** — `pip install opensandbox==0.1.8` plus a running
+  `uvx opensandbox-server`. Notes in [`OPENSANDBOX.md`](./OPENSANDBOX.md).
+- **cubesandbox** — `cube-sandbox-one-click v0.2.0` installed on the
+  same dev box; conf.yaml port overrides documented in
+  [`CUBESANDBOX.md`](./CUBESANDBOX.md).
+- **gvisor** — `runsc` registered as a Docker runtime.
 
 ## Notes
 

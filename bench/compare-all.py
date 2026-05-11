@@ -2,12 +2,14 @@
 """Unified benchmark — spawn N sandboxes that import numpy, on each backend.
 
 Backends:
-  - forkd       — uses forkd Python SDK (warmed parent already has numpy)
-  - cubesandbox — uses e2b_code_interpreter (CubeSandbox is E2B-compatible)
+  - forkd       — forkd Python SDK (warmed parent already has numpy)
+  - cubesandbox — e2b_code_interpreter (CubeSandbox is E2B-compatible)
+  - boxlite     — boxlite Python SDK (each Box is a microVM with its own OCI rootfs)
+  - opensandbox — opensandbox Python SDK (Docker runtime by default)
   - docker      — `docker run python:3.12-slim python -c "import numpy"`
 
-Measures total wall-clock to spawn N sandboxes that have already evaluated
-`numpy.zeros(5).tolist()`. Output: JSON dict suitable for chart generation.
+Measures total wall-clock to spawn N sandboxes that have all evaluated
+`numpy.zeros(5).tolist()`. Output: JSON suitable for chart generation.
 
 Run on the same Linux box for fair comparison.
 """
@@ -117,6 +119,93 @@ def bench_docker(n: int) -> dict:
     }
 
 
+def bench_boxlite(n: int) -> dict:
+    """Spawn N BoxLite microVMs in parallel, run `import numpy` in each."""
+    try:
+        import asyncio
+        import boxlite
+    except ImportError:
+        return {"backend": "boxlite", "n": n,
+                "error": "boxlite not installed (pip install boxlite)"}
+
+    async def one(_i):
+        try:
+            async with boxlite.SimpleBox(image="python:3.12-slim") as box:
+                r = await box.exec(
+                    "python",
+                    "-c",
+                    "import numpy; print(numpy.zeros(5).tolist())",
+                )
+                return getattr(r, "exit_code", 0) == 0
+        except Exception:
+            return False
+
+    async def run_all():
+        return await asyncio.gather(*(one(i) for i in range(n)))
+
+    t0 = time.perf_counter()
+    results = asyncio.run(run_all())
+    t_total = time.perf_counter()
+
+    return {
+        "backend": "boxlite",
+        "n": n,
+        "spawn_ms": int((t_total - t0) * 1000),
+        "eval_ms": 0,
+        "total_ms": int((t_total - t0) * 1000),
+        "succeeded": sum(1 for r in results if r),
+    }
+
+
+def bench_opensandbox(n: int, image: str) -> dict:
+    """Spawn N OpenSandbox sandboxes in parallel via the Python SDK.
+
+    Requires an OpenSandbox server already running locally (default port 8000):
+        uvx opensandbox-server
+    """
+    try:
+        import asyncio
+        from datetime import timedelta
+
+        from opensandbox import Sandbox
+    except ImportError:
+        return {"backend": "opensandbox", "n": n,
+                "error": "opensandbox not installed (pip install opensandbox)"}
+
+    async def one(_i):
+        try:
+            sandbox = await Sandbox.create(
+                image,
+                entrypoint=["/opt/opensandbox/code-interpreter.sh"],
+                timeout=timedelta(minutes=2),
+            )
+            async with sandbox:
+                exe = await sandbox.commands.run(
+                    "python -c 'import numpy; print(numpy.zeros(5).tolist())'"
+                )
+                ok = getattr(exe, "exit_code", 0) == 0
+            await sandbox.kill()
+            return ok
+        except Exception:
+            return False
+
+    async def run_all():
+        return await asyncio.gather(*(one(i) for i in range(n)))
+
+    t0 = time.perf_counter()
+    results = asyncio.run(run_all())
+    t_total = time.perf_counter()
+
+    return {
+        "backend": "opensandbox",
+        "n": n,
+        "spawn_ms": int((t_total - t0) * 1000),
+        "eval_ms": 0,
+        "total_ms": int((t_total - t0) * 1000),
+        "succeeded": sum(1 for r in results if r),
+    }
+
+
 def bench_cubesandbox(n: int, template_id: str) -> dict:
     """Spawn N CubeSandbox sandboxes via E2B SDK + eval numpy in each."""
     try:
@@ -161,9 +250,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--backends", nargs="+", default=["forkd", "docker"],
-                    choices=["forkd", "docker", "cubesandbox"])
+                    choices=["forkd", "docker", "cubesandbox", "boxlite", "opensandbox"])
     ap.add_argument("--cube-template", default="",
                     help="CubeSandbox template ID (from cubemastercli tpl create)")
+    ap.add_argument("--opensandbox-image",
+                    default="opensandbox/code-interpreter:v1.0.2",
+                    help="OpenSandbox image to spawn")
     ap.add_argument("--out", default="/tmp/forkd-bench-results.json")
     args = ap.parse_args()
 
@@ -176,6 +268,10 @@ def main():
             r = bench_docker(args.n)
         elif backend == "cubesandbox":
             r = bench_cubesandbox(args.n, args.cube_template)
+        elif backend == "boxlite":
+            r = bench_boxlite(args.n)
+        elif backend == "opensandbox":
+            r = bench_opensandbox(args.n, args.opensandbox_image)
         print(f"  {r}", flush=True)
         results.append(r)
 
