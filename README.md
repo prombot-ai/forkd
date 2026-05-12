@@ -1,12 +1,23 @@
-# forkd
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img alt="forkd" src="docs/logo.svg" width="220">
+  </picture>
+</div>
+
+<p align="center">
+  <a href="https://github.com/deeplethe/forkd/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/deeplethe/forkd/ci.yml?branch=main&style=flat-square&label=ci"></a>
+  <a href="https://github.com/deeplethe/forkd/releases"><img alt="Release" src="https://img.shields.io/github/v/release/deeplethe/forkd?style=flat-square&color=4c956c"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square"></a>
+  <a href="https://www.rust-lang.org"><img alt="Rust" src="https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust"></a>
+  <a href="https://firecracker-microvm.github.io"><img alt="Firecracker" src="https://img.shields.io/badge/built%20on-Firecracker-blue?style=flat-square"></a>
+  <a href="https://github.com/deeplethe/forkd/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/deeplethe/forkd?style=flat-square&color=e63916"></a>
+  <a href="https://github.com/deeplethe/forkd/issues"><img alt="Issues" src="https://img.shields.io/github/issues/deeplethe/forkd?style=flat-square"></a>
+</p>
 
 A microVM sandbox runtime that forks children from a warmed parent
 snapshot, so each child inherits the parent's address space
 copy-on-write instead of cold-booting its own kernel.
-
-[![CI](https://img.shields.io/github/actions/workflow/status/deeplethe/forkd/ci.yml?branch=main&label=ci)](https://github.com/deeplethe/forkd/actions)
-[![license](https://img.shields.io/badge/license-Apache--2.0-blue)](./LICENSE)
-[![status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/deeplethe/forkd/releases)
 
 forkd is built on Firecracker. The parent VM boots once, imports
 your runtime (Python + your dependencies, a JIT-warmed JVM, an
