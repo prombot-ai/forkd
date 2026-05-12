@@ -16,6 +16,8 @@
   <a href="https://github.com/deeplethe/forkd/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/deeplethe/forkd?style=flat-square&color=eab308&logo=github"></a>
 </p>
 
+## Overview
+
 A microVM sandbox runtime that forks children from a warmed parent
 snapshot, so each child inherits the parent's address space
 copy-on-write instead of cold-booting its own kernel.
@@ -31,8 +33,6 @@ diverge.
 The result is two properties at once: per-child KVM isolation, and a
 spawn cost that's closer to `fork(2)` than to a cold-boot VM.
 
----
-
 ## Properties
 
 - **Hardware isolation.** Each child is its own Firecracker microVM
@@ -47,8 +47,6 @@ spawn cost that's closer to `fork(2)` than to a cold-boot VM.
 - **Operable.** Daemon process owning state, REST API on Unix or TCP,
   Prometheus `/metrics`, append-only JSON audit log, systemd unit.
 - **Open source.** Apache 2.0, no vendor SDK.
-
----
 
 ## Benchmarks
 
@@ -90,8 +88,6 @@ For one sandbox doing the same numpy expression two ways:
 |---|---:|---|
 | `sandbox.eval("numpy.zeros(5).tolist()")` | 1 ms | Reuses the warmed Python in PID 1 |
 | `sandbox.commands.run("python3 -c '...'")` | 96 ms | Cold subprocess re-imports numpy |
-
----
 
 ## How it works
 
@@ -149,8 +145,6 @@ flowchart TB
 See [`DESIGN.md`](./DESIGN.md) for the full design and the open
 problems the architecture leaves on the table.
 
----
-
 ## How forkd compares
 
 The sandbox-runtime space has a wide spread of designs. The table
@@ -189,8 +183,6 @@ open-source analogue.
 runtimes that give up real Linux (single-vCPU, serial I/O only) can
 beat forkd's ~100 ms by an order of magnitude — at the cost of not
 running real Python servers, `apt install`, or outbound HTTPS.
-
----
 
 ## Quick start
 
@@ -244,8 +236,6 @@ with Sandbox() as sb:
     print(sb.eval("numpy.zeros(5).tolist()"))    # reuses warmed PID 1
 ```
 
----
-
 ## Operating in daemon mode
 
 The controller daemon owns the registry of snapshots and live
@@ -277,8 +267,6 @@ Full API reference: [`docs/API.md`](./docs/API.md).
 Operator runbook: [`docs/RUNBOOK.md`](./docs/RUNBOOK.md).
 Security posture: [`docs/SECURITY.md`](./docs/SECURITY.md).
 
----
-
 ## Repository layout
 
 ```
@@ -295,8 +283,6 @@ packaging/systemd/      systemd unit for the controller
 bench/                  Benchmark harness, chart generators, results
 docs/                   API.md, SECURITY.md, RUNBOOK.md
 ```
-
----
 
 ## Status
 
@@ -319,8 +305,6 @@ Production-readiness items not yet in this release:
 
 The roadmap and tracked work live in [GitHub issues](https://github.com/deeplethe/forkd/issues).
 
----
-
 ## Contributing
 
 Pull requests welcome. Before opening one, please:
@@ -330,8 +314,6 @@ Pull requests welcome. Before opening one, please:
 2. `cargo fmt --all && cargo clippy --all-targets -- -D warnings && cargo test --all` locally.
 3. Sign-off your commits (`git commit -s`).
 
----
-
 ## Star history
 
 <a href="https://star-history.com/#deeplethe/forkd&Date">
@@ -340,8 +322,6 @@ Pull requests welcome. Before opening one, please:
     <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=deeplethe/forkd&type=Date">
   </picture>
 </a>
-
----
 
 ## License
 
