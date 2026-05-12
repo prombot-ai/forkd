@@ -47,9 +47,19 @@ spawn cost that's closer to `fork(2)` than to a cold-boot VM.
 - **Warmed runtimes inherit for free.** Imports, JIT compilation, model
   weights, prefetched caches — anything the parent did is already
   resident in the child.
+- **Real Linux per child.** Multi-vCPU, full TCP networking, `apt
+  install`, outbound HTTPS. Unlike function-level snapshot runtimes
+  that trade single-vCPU + serial-I/O for raw spawn speed, forkd
+  children can run real Python servers, model inference, or any
+  workload that needs a full kernel.
 - **Multi-tenant by construction.** Per-child network namespace, per-
   child cgroup v2 memory limit, independent `/dev/urandom` re-seeded
   by `vmgenid` (Linux 5.20+).
+- **Built for agent fan-out.** AI agent workloads that fan out into
+  many short-lived sandboxes — code-interpreter, tool-use, evaluation
+  rollouts — are the design point. The warmed parent collapses the
+  per-request `import numpy` / `import torch` cost across the entire
+  cohort.
 - **Operable.** Daemon process owning state, REST API on Unix or TCP,
   Prometheus `/metrics`, append-only JSON audit log, systemd unit.
 - **Open source.** Apache 2.0, no vendor SDK.
