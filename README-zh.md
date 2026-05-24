@@ -21,7 +21,7 @@
 
 <br/>
 
-## 101 毫秒,fork 出 100 个 microVM。
+## 101 毫秒 fork 100 个 microVM,150 毫秒 BRANCH 一个运行中的 VM。
 
 面向 **AI Agent 扇出**(fan-out)场景的 microVM 沙箱运行时。子 VM
 从一个已"暖启动"的父快照 fork 而来,通过写时复制(CoW)继承
