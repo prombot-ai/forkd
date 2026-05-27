@@ -75,6 +75,15 @@ Bamboo Grove**(岚山竹林,free);"省钱派" 还在 $$ 餐厅那里加上了
 [`recipes/langgraph-react/`](./recipes/langgraph-react/) 和
 [`recipes/langgraph-react/DEMO.md`](./recipes/langgraph-react/DEMO.md)。
 
+### 不仅是推理状态,文件系统状态也继承
+
+针对"难道你不能直接并行调 3 次 LLM 吗"这个常见反驳,看
+[`recipes/coding-agent-fork/`](./recipes/coding-agent-fork/) ——
+50 MiB 的二进制 blob 通过一次 BRANCH 字节完全一致地传到 4 个
+沙箱里。3 个孙沙箱各自对同一个有 bug 的 Python 包应用不同的修复;
+它们的 `__pycache__/` 和编辑互不影响,但那 50 MiB 的继承是共享的。
+字节是塞不进 prompt 的。**BRANCH 操作的 pause 时间 3.3 秒。**
+
 <br/>
 
 ## 关键特性
@@ -328,7 +337,7 @@ N=100 实测 CoW 开销是 **每个 child 0.12 MiB**(详见 [bench/](./bench/)),
 
 ## 快速开始
 
-要求:x86_64 Linux,带 KVM,Ubuntu 22.04 或更新。
+要求:x86_64 Linux,带 KVM,Ubuntu 22.04 或更新。两步跑出一个真 fork:主机准备(一次性),然后 `forkd pull` + fork(~30 秒)。下面再后面的章节是不在 Hub 上的自定义 recipe 的备选路径。
 
 ### 一. 确认主机环境就绪
 
@@ -354,10 +363,25 @@ tap、netns、Firecracker 二进制 + 版本、Docker daemon、快照目录 +
 磁盘空间、内核镜像、controller 可达性、平台),每一项不通过都附带
 具体修复提示。任何东西觉得不对就先跑它。
 
-### 二. 从 Docker 镜像起步(一条命令)
+![forkd doctor —— 配置好的宿主机 14 项全过](./docs/assets/doctor-14pass.webp)
+
+### 二. 第一次 fork(推荐)
+
+```bash
+# 14.5 MiB 的预热快照(Python 3.12 + LangGraph) → ~15 秒下载,自动 sha256 校验。
+forkd pull deeplethe/langgraph-react
+
+# 3 个共享父 VM 内存的子 VM,每个 ~10 ms。
+sudo -E forkd fork --tag langgraph -n 3 --per-child-netns
+```
+
+参见 [`docs/HUB.md`](./docs/HUB.md) 了解 registry 模型 + 如何发布自己的
+snapshot pack。
+
+### 三. 备选:从 Docker 镜像构建
 
 `forkd from-image` 把 Docker pull → ext4 → 启动 + 暖启动 → pause →
-注册 tag 串成一条命令,输出是一个你可以立刻 fork 的 tag:
+注册 tag 串成一条命令。Hub 里还没有的 recipe 用这个:
 
 ```bash
 sudo -E forkd from-image python:3.12-slim \
@@ -368,7 +392,7 @@ sudo -E forkd from-image python:3.12-slim \
 sudo -E forkd fork --tag py-numpy -n 5 --per-child-netns
 ```
 
-### 三. 探测你装的 forkd 实际有多快
+### 四. 探测你装的 forkd 实际有多快
 
 ```bash
 forkd bench --tag py-numpy --n 5
@@ -384,7 +408,7 @@ forkd bench --tag py-numpy --n 5
 
 screenshot 友好,跑一遍能知道 v0.3 在你机器上是不是真有那个速度。
 
-### 四. 从源码构建你自己的暖启动父 VM
+### 五. 备选:从源码构建你自己的暖启动父 VM(进阶)
 
 ```bash
 # 1. 主机准备:KVM、Firecracker、Rust、KSM、大页、tap 设备。
@@ -553,8 +577,9 @@ packaging/k8s/          forkd-controller 的 Kubernetes starter manifest
 recipes/                Framework 集成 recipe(mcp-agent、crewai-fanout、
                         autogen-branch、openai-swarm)+ 预构建 rootfs
                         recipe(python-numpy、e2b-codeinterpreter、
-                        coding-agent、nodejs、agent-workbench)。
-                        详见 recipes/README.md。
+                        jupyter-kernel、coding-agent、nodejs、
+                        playwright-browser、agent-workbench、
+                        postgres-fixture)。详见 recipes/README.md。
 bench/                  基准测试 harness、图表生成器、结果
 docs/                   API.md、SECURITY.md、RUNBOOK.md
 ```
@@ -580,13 +605,16 @@ Roadmap 和正在追踪的工作都在 [GitHub issues](https://github.com/deeple
 版本变更记录:[CHANGELOG.md](./CHANGELOG.md)。
 安全策略与历史漏洞通告:[docs/SECURITY.md](./docs/SECURITY.md)。
 
-**v0.3 phase 1 已 ship (v0.3.0 → v0.3.2)** —— diff-snapshot BRANCH
+**v0.3 phase 1 已 ship (v0.3.0 → v0.3.4)** —— diff-snapshot BRANCH
 把源 VM 暂停时间从 **29.3 秒砍到 205 毫秒（143x）**(4 GiB SSD 源,
 空闲); 典型 agent 工作负载(30-300 MiB 脏页)**6-15x**。v0.3.1
 支持同一 sandbox 上**多次** diff BRANCH —— 5 次连续 diff BRANCH
 聚合下来 **14x** 总暂停时间减少。v0.3.2 把 Python SDK 的
 `spawn_sandboxes(prewarm=...)` 和 `branch_sandbox(diff=..., measure_diff=...)`
-补齐,跟 REST 和 TypeScript SDK 对齐。完整表格和诚实 caveat 见
+补齐,跟 REST 和 TypeScript SDK 对齐。v0.3.4 通过 `posix_fallocate`
+绕过 ext4 mballoc/wbt_wait,关掉了多 BRANCH 暂停异常 (#146)——
+第 6 次连续 BRANCH 从 2.7 秒砍到 153 毫秒,BRANCH 3-10 中位数加速
+**8.5x**。完整表格和诚实 caveat 见
 [`bench/pause-window/RESULTS-v0.3.md`](./bench/pause-window/RESULTS-v0.3.md);
 75 个 trial 的 sweep 原始数据在 `bench/pause-window/*-sweep-*.csv`。
 通过 `POST /v1/sandboxes/:id/branch` 请求体加 `"diff": true` 开启,

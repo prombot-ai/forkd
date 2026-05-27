@@ -53,7 +53,7 @@ write out of the critical section. Try the library API with
 ![forkd wp-bench v0.4 demo](./docs/assets/wp-bench-demo.webp)
 
 Full design: [`DESIGN-v0.4.md`](./DESIGN-v0.4.md). Empirical PoC data
-(3 PoCs, all passing): [`experiments/v0.4-*-poc/`](./experiments/).
+(4 PoCs, all passing): [`experiments/v0.4-*-poc/`](./experiments/).
 Tracking issue [#101](https://github.com/deeplethe/forkd/issues/101).
 
 <br/>
@@ -335,7 +335,7 @@ Measured CoW overhead at N=100 is **0.12 MiB / child** on top of the parent ([be
 
 ## Quick start
 
-Requires: x86_64 Linux with KVM, Ubuntu 22.04 or newer.
+Requires: x86_64 Linux with KVM, Ubuntu 22.04 or newer. Two steps to a real fork: set up the host (one-time), then `forkd pull` + fork (~30 s). The sections after that show alternative entry points for custom recipes.
 
 ### Confirm your host is ready
 
@@ -362,24 +362,26 @@ disk space, kernel image, controller reachability, platform) and emits
 specific fix hints for each non-pass. Run this first whenever something
 feels off.
 
-### Fastest path — pull a pre-built snapshot from the Hub
+![forkd doctor — 14 checks pass on a configured host](./docs/assets/doctor-14pass.webp)
+
+### Run your first fork (recommended)
 
 ```bash
-# 14.5 MiB pack (a Python 3.12 + LangGraph-ready snapshot) → 15s download.
+# 14.5 MiB pack (Python 3.12 + LangGraph ready) → ~15 s download, sha256 verified.
 forkd pull deeplethe/langgraph-react
 
-# Fork 3 children sharing the parent's memory.
+# 3 children sharing the parent's memory, ~10 ms per child.
 sudo -E forkd fork --tag langgraph -n 3 --per-child-netns
 ```
 
 See [`docs/HUB.md`](./docs/HUB.md) for the registry model + how to
 publish your own snapshot pack.
 
-### From a Docker image (one command)
+### Alternative: build from a Docker image
 
 `forkd from-image` wraps Docker pull → ext4 → boot + warmup → pause →
-register tag into a single verb. The output is a tag you can
-immediately fork from:
+register tag into a single verb. Use this when you need a recipe that
+isn't on the Hub yet:
 
 ```bash
 sudo -E forkd from-image python:3.12-slim \
@@ -407,7 +409,7 @@ forkd bench --tag py-numpy --n 5
 Run this against any snapshot to see how forkd actually performs on
 your hardware. Screenshot-friendly output.
 
-### From-source path — build your own warmed parent
+### Alternative: build from source (advanced)
 
 ```bash
 # 1. Host setup: KVM, Firecracker, Rust, KSM, hugepages, tap device.
@@ -652,14 +654,18 @@ Issue-level tracking: [GitHub issues](https://github.com/deeplethe/forkd/issues)
 Release notes per version: [CHANGELOG.md](./CHANGELOG.md).
 Security posture and past advisories: [docs/SECURITY.md](./docs/SECURITY.md).
 
-**v0.3 phase 1 shipped (v0.3.0 → v0.3.2)** — diff-snapshot BRANCH
+**v0.3 phase 1 shipped (v0.3.0 → v0.3.4)** — diff-snapshot BRANCH
 cuts source-pause window from **29.3 s to 205 ms (143×) on a 4 GiB
 SSD source** (idle); typical agent workload (30-300 MiB dirty)
 **6-15×**. Multi-BRANCH on the same sandbox works in v0.3.1 — 5
 consecutive diff BRANCHes give a **14× aggregate** downtime reduction
 vs Full. v0.3.2 closes the SDK surface-parity gap: Python SDK
 `spawn_sandboxes(prewarm=...)` and `branch_sandbox(diff=..., measure_diff=...)`
-now match the REST and TypeScript SDK options. Full table and
+now match the REST and TypeScript SDK options. **v0.3.4 closes the
+multi-BRANCH pause anomaly ([#146](https://github.com/deeplethe/forkd/issues/146))** —
+a 30-line `posix_fallocate` fix bypasses ext4's writeback-throttle
+compounding, so the 6th consecutive BRANCH stays at ~150 ms instead
+of climbing to 2.7 s (17.6× faster). Full table and
 honest caveats in
 [`bench/pause-window/RESULTS-v0.3.md`](./bench/pause-window/RESULTS-v0.3.md);
 75-trial sweep raw data in `bench/pause-window/*-sweep-*.csv`.
